@@ -5,7 +5,7 @@ admin.initializeApp({ credential: admin.credential.cert(chiave) });
 const db = admin.firestore();
 const messaggi = admin.messaging();
 
-const FINESTRA_ORE = 12;   // non manda promemoria scaduti da più di 12 ore
+const FINESTRA_ORE = 1;    // non manda promemoria scaduti da più di 1 ora
 const MAX_ARCHIVIO = 300;  // quanti promemoria già inviati ricordare
 
 // Ora attuale in Italia, come numero (data e ora "da orologio")
@@ -57,7 +57,7 @@ for (const uid of Object.keys(perUtente)) {
     const giaInviati = new Set(arch.exists ? arch.data().chiavi || [] : []);
 
     const daInviare = promemoria.filter((p) => {
-        if (!p || !p.data || !p.testo || p.notificato) return false;
+        if (!p || !p.data || !p.testo) return false;
         if (giaInviati.has(chiaveDi(p))) return false;
         const differenza = adesso - quando(p);
         return differenza >= 0 && differenza <= FINESTRA_ORE * 3600 * 1000;
