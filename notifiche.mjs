@@ -74,7 +74,7 @@ for (const uid of Object.keys(perUtente)) {
                     webpush: { headers: { Urgency: "high", TTL: "3600" } }
                 });
                 inviate++;
-                console.log("Inviato:", p.testo);
+               console.log("Inviato un promemoria");
             } catch (e) {
                 console.error("Errore invio:", e.code || e.message);
                 if (e.code === "messaging/registration-token-not-registered" ||
