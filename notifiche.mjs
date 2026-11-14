@@ -66,3 +66,17 @@ for (const uid of Object.keys(perUtente)) {
                 inviate++;
                 console.log("Inviato:", n.titolo, "-", n.corpo.replace(/\n/g, " / "));
             } catch (e) {
+                console.error("Errore invio:", e.code || e.message);
+                if (e.code === "messaging/registration-token-not-registered" ||
+                    e.code === "messaging/invalid-registration-token") {
+                    await d.ref.delete();
+                }
+            }
+        }
+        giaInviati.add(n.chiave);
+    }
+
+    await refArchivio.set({ chiavi: Array.from(giaInviati).slice(-MAX_ARCHIVIO) });
+}
+
+console.log("Fatto. Notifiche inviate:", inviate);
