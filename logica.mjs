@@ -16,8 +16,9 @@ export function chiavePromemoria(p) {
     return p.data + "|" + (p.ora || "") + "|" + p.testo;
 }
 
-export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleanni = [], adesso, giaInviati }) {
+export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleanni = [], adesso, giaInviati, tipi = {} }) {
     const risultato = [];
+    const acceso = (nome) => !tipi || tipi[nome] !== false;
     const d = new Date(adesso);
     const oggi = d.getUTCFullYear() + "-" + p2(d.getUTCMonth() + 1) + "-" + p2(d.getUTCDate());
     const mattina = Date.parse(oggi + "T" + p2(ORA_MATTINA) + ":00:00Z");
