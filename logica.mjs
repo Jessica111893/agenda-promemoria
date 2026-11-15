@@ -18,7 +18,7 @@ export function chiavePromemoria(p) {
 
 export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleanni = [], adesso, giaInviati, tipi = {} }) {
     const risultato = [];
-    const acceso = (nome) => !tipi || tipi[nome] !== false;
+    const acceso = (nome) => !tipi || tipi[nome] !== false;   // se non scelto, la notifica è accesa
     const d = new Date(adesso);
     const oggi = d.getUTCFullYear() + "-" + p2(d.getUTCMonth() + 1) + "-" + p2(d.getUTCDate());
     const mattina = Date.parse(oggi + "T" + p2(ORA_MATTINA) + ":00:00Z");
@@ -26,6 +26,7 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
 
     // 1) Promemoria: all'ora esatta (come prima)
     promemoria.forEach((p) => {
+        if (!acceso("promemoria")) return;
         if (!p || !p.data || !p.testo || p.notificato) return;
         const chiave = chiavePromemoria(p);
         if (giaInviati.has(chiave)) return;
@@ -37,6 +38,7 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
 
     // 2) Appuntamenti con l'ora: un'ora prima
     appuntamenti.forEach((a) => {
+        if (!acceso("appuntamenti")) return;
         if (!a || !a.data || !a.titolo || !a.ora) return;
         const chiave = "app1h|" + a.data + "|" + a.ora + "|" + a.titolo;
         if (giaInviati.has(chiave)) return;
@@ -53,7 +55,7 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
             .filter((a) => a && a.data === oggi && a.titolo)
             .sort((x, y) => (x.ora || "99:99").localeCompare(y.ora || "99:99"));
         const chiaveM = "mattina|" + oggi;
-        if (oggiApp.length > 0 && !giaInviati.has(chiaveM)) {
+        if (acceso("mattina") && oggiApp.length > 0 && !giaInviati.has(chiaveM)) {
             const righe = oggiApp.map((a) => (a.ora ? a.ora + " " : "") + a.titolo);
             risultato.push({
                 chiave: chiaveM,
@@ -65,6 +67,7 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
 
         // 4) Mattina: compleanni di oggi
         compleanni.forEach((c) => {
+            if (!acceso("compleanni")) return;
             if (!c || !c.nome || Number(c.giorno) !== d.getUTCDate() || Number(c.mese) !== d.getUTCMonth() + 1) return;
             const chiave = "compl|" + oggi + "|" + c.nome;
             if (giaInviati.has(chiave)) return;
