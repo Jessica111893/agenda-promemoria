@@ -28,6 +28,22 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
     promemoria.forEach((p) => {
         if (!acceso("promemoria")) return;
         if (!p || !p.data || !p.testo || p.notificato) return;
+        if (!p.ora) {
+            // senza orario: una notifica la sera prima alle 20:00 e una la mattina alle 8:00
+            const giorno = Date.parse(p.data + "T00:00:00Z");
+            const sera = giorno - 4 * 3600 * 1000;
+            const alle8 = giorno + ORA_MATTINA * 3600 * 1000;
+            const finestra = FINESTRA_MATTINA_ORE * 3600 * 1000;
+            const chiaveSera = "pmsera|" + p.data + "|" + p.testo;
+            const chiaveMat = "pmmat|" + p.data + "|" + p.testo;
+            if (adesso >= sera && adesso < sera + finestra && !giaInviati.has(chiaveSera)) {
+                risultato.push({ chiave: chiaveSera, titolo: "🔔 Domani", corpo: p.testo, tag: chiaveSera });
+            }
+            if (adesso >= alle8 && adesso <= alle8 + finestra && !giaInviati.has(chiaveMat)) {
+                risultato.push({ chiave: chiaveMat, titolo: "🔔 Oggi", corpo: p.testo, tag: chiaveMat });
+            }
+            return;
+        }
         const chiave = chiavePromemoria(p);
         if (giaInviati.has(chiave)) return;
         const differenza = adesso - quando(p.data, p.ora);
