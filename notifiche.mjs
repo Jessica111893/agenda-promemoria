@@ -31,7 +31,12 @@ async function leggiDati(uid) {
         if (!dati.exists) return [];
         try { const v = JSON.parse(dati.data()[nome] || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; }
     };
-    return { promemoria: leggi("promemoria"), appuntamenti: leggi("appuntamenti"), compleanni: leggi("compleanni") };
+    let tipi = {};
+    try {
+        const pers = await db.doc("utenti/" + uid + "/dati/principale").get();
+        if (pers.exists && typeof pers.data().notificheTipi === "string") tipi = JSON.parse(pers.data().notificheTipi) || {};
+    } catch (e) { tipi = {}; }
+    return { promemoria: leggi("promemoria"), appuntamenti: leggi("appuntamenti"), compleanni: leggi("compleanni"), tipi };
 }
 
 const adesso = oraItalia();
