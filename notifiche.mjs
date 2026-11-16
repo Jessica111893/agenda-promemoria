@@ -43,6 +43,30 @@ async function leggiDati(uid) {
     // e nemmeno quelli della sua agenda personale ("La mia agenda"): arrivano solo i tuoi e quelli di coppia
     const diAltri = (x) => !!x && x.coppia === false && !!x.daUid && x.daUid !== uid;
     let appuntamenti = leggi("appuntamenti").filter((a) => (!a || !a.soloDi || a.soloDi === uid) && !diAltri(a));
+    // Impegni che si ripetono: si preparano la prossima volta e quella dopo (per gli avvisi del giorno prima)
+    const oggiR = new Date(adesso).toISOString().slice(0, 10);
+    const isoR = (d) => d.toISOString().slice(0, 10);
+    function ripete(a, iso) {
+        if (iso < a.data || (a.ripetiFino && iso > a.ripetiFino)) return false;
+        const d0 = new Date(a.data + "T12:00:00Z"), d = new Date(iso + "T12:00:00Z");
+        if (a.ripeti === "giorno") return true;
+        if (a.ripeti === "settimana") return d.getUTCDay() === d0.getUTCDay();
+        if (a.ripeti === "mese") return d.getUTCDate() === d0.getUTCDate();
+        if (a.ripeti === "anno") return d.getUTCDate() === d0.getUTCDate() && d.getUTCMonth() === d0.getUTCMonth();
+        return false;
+    }
+    const espansi = [];
+    appuntamenti.forEach((a) => {
+        if (!a || !a.ripeti || !a.data) { espansi.push(a); return; }
+        const d = new Date(oggiR + "T12:00:00Z");
+        let trovati = 0;
+        for (let i = 0; i < 400 && trovati < 2; i++) {
+            const iso = isoR(d);
+            if (ripete(a, iso)) { espansi.push(Object.assign({}, a, { data: iso })); trovati++; }
+            d.setUTCDate(d.getUTCDate() + 1);
+        }
+    });
+    appuntamenti = espansi;
     // Modalità vacanza: niente impegni di Lavoro e niente riepiloghi di mattina e sera
     const oggiIt = new Date(adesso).toISOString().slice(0, 10);
     if (vacanzaFino && oggiIt <= vacanzaFino) {
