@@ -52,27 +52,59 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
         }
     });
 
-    // 2) Appuntamenti con l'ora: un'ora prima
+    // 2) Appuntamenti, scadenze ed eventi: l'avviso scelto nell'app (di base un'ora prima)
+    const ORA_SERA = 20;
+    const euro = (n) => Number(n).toFixed(2).replace(".", ",") + " €";
     appuntamenti.forEach((a) => {
         if (!acceso("appuntamenti")) return;
-        if (!a || !a.data || !a.titolo || !a.ora) return;
-        const chiave = "app1h|" + a.data + "|" + a.ora + "|" + a.titolo;
+        if (!a || !a.data || !a.titolo) return;
+        const giorno = Date.parse(a.data + "T00:00:00Z");
+        const finestraSera = FINESTRA_MATTINA_ORE * 3600 * 1000;
+        // scadenze: la sera prima (o 3 giorni prima) alle 20:00
+        if (a.tipo === "scadenza") {
+            if (a.pagata) return;
+            const av = a.avviso || "giorno";
+            if (av === "no") return;
+            const prima = av === "3giorni" ? 3 : 1;
+            const alle = giorno - prima * 86400000 + ORA_SERA * 3600 * 1000;
+            const chiave = "sca" + prima + "|" + a.data + "|" + a.titolo;
+            if (adesso >= alle && adesso < alle + finestraSera && !giaInviati.has(chiave)) {
+                risultato.push({ chiave, titolo: prima === 1 ? "💳 Domani scade" : "💳 Tra 3 giorni scade", corpo: a.titolo + (a.importo ? " · " + euro(a.importo) : ""), tag: chiave });
+            }
+            return;
+        }
+        if (a.tipo === "evento") return;   // gli eventi di più giorni arrivano nel riepilogo del mattino
+        const av = (a.avviso === undefined || a.avviso === null || a.avviso === "") ? "60" : String(a.avviso);
+        if (av === "no") return;
+        if (av === "giorno") {
+            const alle = giorno - 86400000 + ORA_SERA * 3600 * 1000;
+            const chiave = "appg|" + a.data + "|" + (a.ora || "") + "|" + a.titolo;
+            if (adesso >= alle && adesso < alle + finestraSera && !giaInviati.has(chiave)) {
+                risultato.push({ chiave, titolo: "📅 Domani", corpo: (a.ora ? a.ora + " · " : "") + a.titolo, tag: chiave });
+            }
+            return;
+        }
+        if (!a.ora) return;                 // senza orario: solo nel riepilogo del mattino
+        const minuti = Number(av);
+        if (isNaN(minuti)) return;
+        const chiave = (minuti === MINUTI_PRIMA ? "app1h|" : "app" + minuti + "|") + a.data + "|" + a.ora + "|" + a.titolo;
         if (giaInviati.has(chiave)) return;
         const mancano = (quando(a.data, a.ora) - adesso) / 60000;   // minuti all'appuntamento
-        if (mancano > 0 && mancano <= MINUTI_PRIMA) {
-            const tra = mancano >= 55 ? "Tra 1 ora" : "Tra " + Math.max(1, Math.round(mancano)) + " minuti";
-            risultato.push({ chiave, titolo: "📅 " + tra, corpo: a.ora + " · " + a.titolo, tag: chiave });
+        const dentro = minuti === MINUTI_PRIMA ? (mancano > 0 && mancano <= minuti) : (mancano <= minuti && mancano > -15);
+        if (dentro) {
+            const tra = mancano <= 0 ? "Adesso" : mancano >= 55 ? "Tra 1 ora" : "Tra " + Math.max(1, Math.round(mancano)) + " minuti";
+            risultato.push({ chiave, titolo: "📅 " + tra, corpo: a.ora + " · " + a.titolo + (a.luogo ? "\n📍 " + a.luogo : ""), tag: chiave });
         }
     });
 
     // 3) Mattina: riepilogo degli appuntamenti di oggi (anche quelli senza ora)
     if (nelMattino) {
         const oggiApp = appuntamenti
-            .filter((a) => a && a.data === oggi && a.titolo)
+            .filter((a) => a && a.titolo && !a.pagata && (a.tipo === "evento" && a.fine ? (a.data <= oggi && oggi <= a.fine) : a.data === oggi))
             .sort((x, y) => (x.ora || "99:99").localeCompare(y.ora || "99:99"));
         const chiaveM = "mattina|" + oggi;
         if (acceso("mattina") && oggiApp.length > 0 && !giaInviati.has(chiaveM)) {
-            const righe = oggiApp.map((a) => (a.ora ? a.ora + " " : "") + a.titolo);
+            const righe = oggiApp.map((a) => (a.tipo === "scadenza" ? "💳 " : a.tipo === "evento" ? "🌴 " : "") + (a.ora ? a.ora + " " : "") + a.titolo);
             risultato.push({
                 chiave: chiaveM,
                 titolo: oggiApp.length === 1 ? "☀️ Oggi hai 1 impegno" : "☀️ Oggi hai " + oggiApp.length + " impegni",
@@ -88,10 +120,12 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
             const chiave = "compl|" + oggi + "|" + c.nome;
             if (giaInviati.has(chiave)) return;
             const anni = c.anno ? d.getUTCFullYear() - Number(c.anno) : 0;
+            const anniv = c.tipo === "anniversario";
             risultato.push({
                 chiave,
-                titolo: "🎂 Compleanno",
-                corpo: "Oggi è il compleanno di " + c.nome + (anni > 0 ? ", compie " + anni + " anni" : "") + "!",
+                titolo: anniv ? "💍 Anniversario" : "🎂 Compleanno",
+                corpo: anniv ? "Oggi: " + c.nome + (anni > 0 ? " · " + anni + (anni === 1 ? " anno" : " anni") + " insieme" : "") + " 💕"
+                    : "Oggi è il compleanno di " + c.nome + (anni > 0 ? ", compie " + anni + " anni" : "") + "!",
                 tag: chiave
             });
         });
