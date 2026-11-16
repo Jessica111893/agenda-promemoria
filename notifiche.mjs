@@ -31,12 +31,15 @@ async function leggiDati(uid) {
         if (!dati.exists) return [];
         try { const v = JSON.parse(dati.data()[nome] || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; }
     };
+    // Quali notifiche vuole questa persona: sono scelte nell'app e salvate nel suo spazio personale
     let tipi = {};
     try {
         const pers = await db.doc("utenti/" + uid + "/dati/principale").get();
         if (pers.exists && typeof pers.data().notificheTipi === "string") tipi = JSON.parse(pers.data().notificheTipi) || {};
     } catch (e) { tipi = {}; }
-    return { promemoria: leggi("promemoria"), appuntamenti: leggi("appuntamenti"), compleanni: leggi("compleanni"), tipi };
+    // "Solo per me": gli impegni privati dell'altra persona non arrivano
+    const appuntamenti = leggi("appuntamenti").filter((a) => !a || !a.soloDi || a.soloDi === uid);
+    return { promemoria: leggi("promemoria"), appuntamenti, compleanni: leggi("compleanni"), tipi };
 }
 
 const adesso = oraItalia();
