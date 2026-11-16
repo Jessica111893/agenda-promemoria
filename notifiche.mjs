@@ -33,12 +33,21 @@ async function leggiDati(uid) {
     };
     // Quali notifiche vuole questa persona: sono scelte nell'app e salvate nel suo spazio personale
     let tipi = {};
+    let vacanzaFino = "";
     try {
         const pers = await db.doc("utenti/" + uid + "/dati/principale").get();
         if (pers.exists && typeof pers.data().notificheTipi === "string") tipi = JSON.parse(pers.data().notificheTipi) || {};
+        if (pers.exists && typeof pers.data().vacanzaFino === "string") vacanzaFino = pers.data().vacanzaFino;
     } catch (e) { tipi = {}; }
     // "Solo per me": gli impegni privati dell'altra persona non arrivano
-    const appuntamenti = leggi("appuntamenti").filter((a) => !a || !a.soloDi || a.soloDi === uid);
+    let appuntamenti = leggi("appuntamenti").filter((a) => !a || !a.soloDi || a.soloDi === uid);
+    // Modalità vacanza: niente impegni di Lavoro e niente riepiloghi di mattina e sera
+    const oggiIt = new Date(adesso).toISOString().slice(0, 10);
+    if (vacanzaFino && oggiIt <= vacanzaFino) {
+        appuntamenti = appuntamenti.filter((a) => !a || !/lavoro/i.test(String(a.categoria || "")));
+        tipi = Object.assign({}, tipi, { mattina: false, sera: false });
+        console.log("In vacanza fino al", vacanzaFino);
+    }
     // biglietti della Bacheca scritti dall'altra persona nelle ultime 6 ore
     const ora = Date.now();
     const messaggi = leggi("bacheca").filter((m) => m && m.testo && m.daUid && m.daUid !== uid && ora - Number(m.quando || 0) < 6 * 3600 * 1000);
