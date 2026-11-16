@@ -40,7 +40,9 @@ async function leggiDati(uid) {
         if (pers.exists && typeof pers.data().vacanzaFino === "string") vacanzaFino = pers.data().vacanzaFino;
     } catch (e) { tipi = {}; }
     // "Solo per me": gli impegni privati dell'altra persona non arrivano
-    let appuntamenti = leggi("appuntamenti").filter((a) => !a || !a.soloDi || a.soloDi === uid);
+    // e nemmeno quelli della sua agenda personale ("La mia agenda"): arrivano solo i tuoi e quelli di coppia
+    const diAltri = (x) => !!x && x.coppia === false && !!x.daUid && x.daUid !== uid;
+    let appuntamenti = leggi("appuntamenti").filter((a) => (!a || !a.soloDi || a.soloDi === uid) && !diAltri(a));
     // Modalità vacanza: niente impegni di Lavoro e niente riepiloghi di mattina e sera
     const oggiIt = new Date(adesso).toISOString().slice(0, 10);
     if (vacanzaFino && oggiIt <= vacanzaFino) {
@@ -51,7 +53,7 @@ async function leggiDati(uid) {
     // biglietti della Bacheca scritti dall'altra persona nelle ultime 6 ore
     const ora = Date.now();
     const messaggi = leggi("bacheca").filter((m) => m && m.testo && m.daUid && m.daUid !== uid && ora - Number(m.quando || 0) < 6 * 3600 * 1000);
-    return { promemoria: leggi("promemoria"), appuntamenti, compleanni: leggi("compleanni"), messaggi, tipi };
+    return { promemoria: leggi("promemoria").filter((p) => !diAltri(p)), appuntamenti, compleanni: leggi("compleanni"), messaggi, tipi };
 }
 
 const adesso = oraItalia();
