@@ -130,5 +130,34 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
             });
         });
     }
+    // 5) Sera alle 21: cosa c'è domani
+    const ORA_SERA_RIEP = 21;
+    const sera = Date.parse(oggi + "T" + p2(ORA_SERA_RIEP) + ":00:00Z");
+    if (acceso("sera") && adesso >= sera && adesso <= sera + 3 * 3600 * 1000) {
+        const dd = new Date(Date.parse(oggi + "T12:00:00Z") + 86400000);
+        const domani = dd.getUTCFullYear() + "-" + p2(dd.getUTCMonth() + 1) + "-" + p2(dd.getUTCDate());
+        const chiaveS = "sera|" + oggi;
+        if (!giaInviati.has(chiaveS)) {
+            const righe = [];
+            appuntamenti
+                .filter((a) => a && a.titolo && !a.pagata && (a.tipo === "evento" && a.fine ? (a.data <= domani && domani <= a.fine) : a.data === domani))
+                .sort((x, y) => (x.ora || "99:99").localeCompare(y.ora || "99:99"))
+                .forEach((a) => righe.push((a.tipo === "scadenza" ? "💳 " : a.tipo === "evento" ? "🌴 " : "") + (a.ora ? a.ora + " " : "") + a.titolo));
+            promemoria
+                .filter((p) => p && p.testo && !p.notificato && p.data === domani)
+                .forEach((p) => righe.push("🔔 " + (p.ora ? p.ora + " " : "") + p.testo));
+            compleanni
+                .filter((c) => c && c.nome && Number(c.giorno) === dd.getUTCDate() && Number(c.mese) === dd.getUTCMonth() + 1)
+                .forEach((c) => righe.push((c.tipo === "anniversario" ? "💍 " : "🎂 ") + c.nome));
+            if (righe.length > 0) {
+                risultato.push({
+                    chiave: chiaveS,
+                    titolo: righe.length === 1 ? "🌙 Domani hai 1 impegno" : "🌙 Domani hai " + righe.length + " impegni",
+                    corpo: righe.join("\n"),
+                    tag: chiaveS
+                });
+            }
+        }
+    }
     return risultato;
 }
