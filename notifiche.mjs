@@ -39,7 +39,10 @@ async function leggiDati(uid) {
     } catch (e) { tipi = {}; }
     // "Solo per me": gli impegni privati dell'altra persona non arrivano
     const appuntamenti = leggi("appuntamenti").filter((a) => !a || !a.soloDi || a.soloDi === uid);
-    return { promemoria: leggi("promemoria"), appuntamenti, compleanni: leggi("compleanni"), tipi };
+    // biglietti della Bacheca scritti dall'altra persona nelle ultime 6 ore
+    const ora = Date.now();
+    const messaggi = leggi("bacheca").filter((m) => m && m.testo && m.daUid && m.daUid !== uid && ora - Number(m.quando || 0) < 6 * 3600 * 1000);
+    return { promemoria: leggi("promemoria"), appuntamenti, compleanni: leggi("compleanni"), messaggi, tipi };
 }
 
 const adesso = oraItalia();
