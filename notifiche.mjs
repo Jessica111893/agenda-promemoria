@@ -1,5 +1,5 @@
 import admin from "firebase-admin";
-import { calcolaNotifiche } from "./logica.mjs";
+import { calcolaNotifiche, inSilenzio } from "./logica.mjs";
 
 const chiave = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 admin.initializeApp({ credential: admin.credential.cert(chiave) });
@@ -77,7 +77,10 @@ async function leggiDati(uid) {
     // biglietti della Bacheca scritti dall'altra persona nelle ultime 6 ore
     const ora = Date.now();
     const messaggi = leggi("bacheca").filter((m) => m && m.testo && m.daUid && m.daUid !== uid && ora - Number(m.quando || 0) < 6 * 3600 * 1000);
-    return { promemoria: leggi("promemoria").filter((p) => !diAltri(p)), appuntamenti, compleanni: leggi("compleanni"), messaggi, tipi };
+    // lettere a tempo: arrivano a chi le riceve (chi usa l'agenda da solo riceve anche le sue)
+    const lettere = leggi("lettere").filter((l) => l && (!spazio || l.daUid !== uid));
+    const rinnovi = leggi("rinnovi");
+    return { promemoria: leggi("promemoria").filter((p) => !diAltri(p)), appuntamenti, compleanni: leggi("compleanni"), messaggi, rinnovi, lettere, tipi };
 }
 
 const adesso = oraItalia();
@@ -94,6 +97,8 @@ let inviate = 0;
 
 for (const uid of Object.keys(perUtente)) {
     const dati = await leggiDati(uid);
+    // ore di silenzio: non si manda niente, le notifiche ancora valide partono dopo
+    if (inSilenzio(dati.tipi, adesso)) { console.log("Ore di silenzio per", uid); continue; }
     const refArchivio = db.doc("utenti/" + uid + "/server/inviati");
     const arch = await refArchivio.get();
     const giaInviati = new Set(arch.exists ? arch.data().chiavi || [] : []);
