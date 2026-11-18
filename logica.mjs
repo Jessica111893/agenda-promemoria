@@ -16,7 +16,7 @@ export function chiavePromemoria(p) {
     return p.data + "|" + (p.ora || "") + "|" + p.testo;
 }
 
-export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleanni = [], messaggi = [], adesso, giaInviati, tipi = {} }) {
+export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleanni = [], messaggi = [], rinnovi = [], lettere = [], adesso, giaInviati, tipi = {} }) {
     const risultato = [];
     const acceso = (nome) => !tipi || tipi[nome] !== false;   // se non scelto, la notifica è accesa
     const d = new Date(adesso);
@@ -166,5 +166,35 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
         if (giaInviati.has(chiave)) return;
         risultato.push({ chiave, titolo: "💌 " + (m.da ? "Biglietto da " + m.da : "Nuovo biglietto"), corpo: m.testo, tag: chiave });
     });
+    // 7) Da rinnovare: un mese prima, una settimana prima e il giorno stesso (la mattina)
+    if (nelMattino && acceso("rinnovi")) {
+        rinnovi.forEach((r) => {
+            if (!r || !r.nome || !r.data) return;
+            const mancano = Math.round((Date.parse(r.data + "T00:00:00Z") - Date.parse(oggi + "T00:00:00Z")) / 86400000);
+            if ([30, 7, 0].indexOf(mancano) < 0) return;
+            const chiave = "rinn" + mancano + "|" + r.data + "|" + r.nome;
+            if (giaInviati.has(chiave)) return;
+            const titolo = mancano === 0 ? "📋 Scade oggi" : mancano === 7 ? "📋 Scade tra una settimana" : "📋 Scade tra un mese";
+            risultato.push({ chiave, titolo, corpo: r.nome + (mancano === 0 ? "" : " · " + Number(r.data.slice(8, 10)) + "/" + Number(r.data.slice(5, 7))), tag: chiave });
+        });
+    }
+    // 8) Lettere a tempo: la mattina del giorno in cui si possono aprire
+    if (nelMattino && acceso("lettere")) {
+        lettere.forEach((l) => {
+            if (!l || !l.id || l.apri !== oggi) return;
+            const chiave = "lett|" + l.id;
+            if (giaInviati.has(chiave)) return;
+            risultato.push({ chiave, titolo: "💌 Oggi si apre una lettera", corpo: l.da ? "Te l'ha scritta " + l.da + ": aprila nell'agenda" : "Aprila nell'agenda", tag: chiave });
+        });
+    }
     return risultato;
+}
+
+// Ore di silenzio: true se adesso le notifiche devono aspettare
+export function inSilenzio(tipi, adesso) {
+    if (!tipi || tipi.silenzio !== true) return false;
+    const da = Number(tipi.silenzioDa), a = Number(tipi.silenzioA);
+    if (isNaN(da) || isNaN(a) || da === a) return false;
+    const h = new Date(adesso).getUTCHours();
+    return da < a ? (h >= da && h < a) : (h >= da || h < a);
 }
