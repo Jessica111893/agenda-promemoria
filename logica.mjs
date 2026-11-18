@@ -16,7 +16,7 @@ export function chiavePromemoria(p) {
     return p.data + "|" + (p.ora || "") + "|" + p.testo;
 }
 
-export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleanni = [], messaggi = [], rinnovi = [], lettere = [], adesso, giaInviati, tipi = {} }) {
+export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleanni = [], messaggi = [], pensierini = [], rinnovi = [], lettere = [], adesso, giaInviati, tipi = {} }) {
     const risultato = [];
     const acceso = (nome) => !tipi || tipi[nome] !== false;   // se non scelto, la notifica è accesa
     const d = new Date(adesso);
@@ -159,12 +159,23 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
             }
         }
     }
-    // 6) Bacheca: un biglietto nuovo dall'altra persona
+    // 6) Chat e "Pensavo a te" dall'altra persona
     messaggi.forEach((m) => {
         if (!acceso("messaggi") || !m || !m.testo || !m.id) return;
         const chiave = "msg|" + m.id;
         if (giaInviati.has(chiave)) return;
-        risultato.push({ chiave, titolo: "💌 " + (m.da ? "Biglietto da " + m.da : "Nuovo biglietto"), corpo: m.testo, tag: chiave });
+        if (m.tipo === "pensiero") {
+            risultato.push({ chiave, titolo: "💭 " + (m.da ? m.da + " ti sta pensando" : "Qualcuno ti sta pensando"), corpo: "Un pensiero per te 💕", tag: chiave });
+        } else {
+            risultato.push({ chiave, titolo: "💬 " + (m.da ? m.da : "Nuovo messaggio"), corpo: m.testo, tag: chiave });
+        }
+    });
+    // 6b) Pensierini: uno nuovo lasciato dall'altra persona
+    pensierini.forEach((b) => {
+        if (!acceso("pensierini") || !b || !b.testo || !b.id) return;
+        const chiave = "pens|" + b.id;
+        if (giaInviati.has(chiave)) return;
+        risultato.push({ chiave, titolo: "📝 " + (b.da ? "Un pensierino da " + b.da : "Un nuovo pensierino"), corpo: b.testo, tag: chiave });
     });
     // 7) Da rinnovare: un mese prima, una settimana prima e il giorno stesso (la mattina)
     if (nelMattino && acceso("rinnovi")) {
