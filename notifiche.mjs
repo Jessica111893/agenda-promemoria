@@ -79,10 +79,22 @@ async function leggiDati(uid) {
     const messaggi = leggi("bacheca").filter((m) => m && m.testo && m.daUid && m.daUid !== uid && ora - Number(m.quando || 0) < 6 * 3600 * 1000);
     // pensierini lasciati dall'altra persona nelle ultime 6 ore
     const pensierini = leggi("biglietti").filter((b) => b && b.testo && b.daUid && b.daUid !== uid && ora - Number(b.quando || 0) < 6 * 3600 * 1000);
+    // faccende di casa: nuove o appena fatte dall'altra persona (nelle ultime 6 ore)
+    const sei = 6 * 3600 * 1000;
+    const faccende = leggi("faccende");
+    const faccendeNuove = faccende.filter((f) => f && f.testo && f.id && f.daUid && f.daUid !== uid && ora - Number(f.creata || 0) < sei);
+    const faccendeFatte = [];
+    faccende.forEach((f) => {
+        if (!f || !f.testo || !f.id || !f.fatteAlle || !f.fatte) return;
+        Object.keys(f.fatteAlle).forEach((k) => {
+            const chi = f.fatte[k], q = Number(f.fatteAlle[k]);
+            if (chi && chi !== uid && ora - q < sei) faccendeFatte.push({ id: f.id, testo: f.testo, quando: q, da: (f.fatteDa || {})[k] || "" });
+        });
+    });
     // lettere a tempo: arrivano a chi le riceve (chi usa l'agenda da solo riceve anche le sue)
     const lettere = leggi("lettere").filter((l) => l && (!spazio || l.daUid !== uid));
     const rinnovi = leggi("rinnovi");
-    return { promemoria: leggi("promemoria").filter((p) => !diAltri(p)), appuntamenti, compleanni: leggi("compleanni"), messaggi, pensierini, rinnovi, lettere, tipi };
+    return { promemoria: leggi("promemoria").filter((p) => !diAltri(p)), appuntamenti, compleanni: leggi("compleanni"), messaggi, pensierini, faccendeNuove, faccendeFatte, rinnovi, lettere, tipi };
 }
 
 const adesso = oraItalia();
