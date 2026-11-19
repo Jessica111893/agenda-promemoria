@@ -16,7 +16,7 @@ export function chiavePromemoria(p) {
     return p.data + "|" + (p.ora || "") + "|" + p.testo;
 }
 
-export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleanni = [], messaggi = [], pensierini = [], rinnovi = [], lettere = [], adesso, giaInviati, tipi = {} }) {
+export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleanni = [], messaggi = [], pensierini = [], faccendeNuove = [], faccendeFatte = [], rinnovi = [], lettere = [], adesso, giaInviati, tipi = {} }) {
     const risultato = [];
     const acceso = (nome) => !tipi || tipi[nome] !== false;   // se non scelto, la notifica è accesa
     const d = new Date(adesso);
@@ -176,6 +176,19 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
         const chiave = "pens|" + b.id;
         if (giaInviati.has(chiave)) return;
         risultato.push({ chiave, titolo: "📝 " + (b.da ? "Un pensierino da " + b.da : "Un nuovo pensierino"), corpo: b.testo, tag: chiave });
+    });
+    // 6c) Faccende di casa: una nuova aggiunta dall'altra persona, o una segnata come fatta
+    faccendeNuove.forEach((f) => {
+        if (!acceso("faccende") || !f || !f.testo || !f.id) return;
+        const chiave = "facn|" + f.id;
+        if (giaInviati.has(chiave)) return;
+        risultato.push({ chiave, titolo: "🧹 " + (f.da ? f.da + " ha aggiunto una faccenda" : "Una nuova faccenda"), corpo: f.testo, tag: chiave });
+    });
+    faccendeFatte.forEach((f) => {
+        if (!acceso("faccende") || !f || !f.testo || !f.id) return;
+        const chiave = "facf|" + f.id + "|" + f.quando;
+        if (giaInviati.has(chiave)) return;
+        risultato.push({ chiave, titolo: "✅ " + (f.da ? f.da + " ha fatto una faccenda" : "Una faccenda è fatta"), corpo: f.testo, tag: chiave });
     });
     // 7) Da rinnovare: un mese prima, una settimana prima e il giorno stesso (la mattina)
     if (nelMattino && acceso("rinnovi")) {
