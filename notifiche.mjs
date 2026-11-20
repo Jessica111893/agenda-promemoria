@@ -94,7 +94,9 @@ async function leggiDati(uid) {
     // lettere a tempo: arrivano a chi le riceve (chi usa l'agenda da solo riceve anche le sue)
     const lettere = leggi("lettere").filter((l) => l && (!spazio || l.daUid !== uid));
     const rinnovi = leggi("rinnovi");
-    return { promemoria: leggi("promemoria").filter((p) => !diAltri(p)), appuntamenti, compleanni: leggi("compleanni"), messaggi, pensierini, faccendeNuove, faccendeFatte, rinnovi, lettere, tipi };
+    // faccende con i giorni e "🔔 Ricordamelo": avviso la mattina del loro giorno
+    const faccendeRicorda = faccende.filter((f) => f && f.ricorda && Array.isArray(f.giorni) && f.giorni.length);
+    return { promemoria: leggi("promemoria").filter((p) => !diAltri(p)), appuntamenti, compleanni: leggi("compleanni"), messaggi, pensierini, faccendeNuove, faccendeFatte, faccende: faccendeRicorda, rinnovi, lettere, tipi };
 }
 
 const adesso = oraItalia();
@@ -123,7 +125,7 @@ for (const uid of Object.keys(perUtente)) {
     for (const n of daInviare) {
         for (const d of perUtente[uid]) {
             try {
-                               await messaggi.send({
+                await messaggi.send({
                     token: d.id,
                     data: { titolo: n.titolo, corpo: n.corpo, tag: n.tag },
                     webpush: { headers: { Urgency: "high", TTL: "3600" } },
