@@ -96,7 +96,10 @@ async function leggiDati(uid) {
     const rinnovi = leggi("rinnovi");
     // faccende con i giorni e "🔔 Ricordamelo": avviso la mattina del loro giorno
     const faccendeRicorda = faccende.filter((f) => f && f.ricorda && Array.isArray(f.giorni) && f.giorni.length);
-    return { promemoria: leggi("promemoria").filter((p) => !diAltri(p)), appuntamenti, compleanni: leggi("compleanni"), messaggi, pensierini, faccendeNuove, faccendeFatte, faccende: faccendeRicorda, rinnovi, lettere, tipi };
+    // budget del mese (è un numero, non una lista) e spese: per l'avviso del budget e il riepilogo della domenica
+    let budget = 0;
+    try { budget = Number(JSON.parse(dati.exists ? dati.data().budget || "0" : "0")) || 0; } catch (e) { budget = 0; }
+    return { promemoria: leggi("promemoria").filter((p) => !diAltri(p)), appuntamenti, compleanni: leggi("compleanni"), messaggi, pensierini, faccendeNuove, faccendeFatte, faccende: faccendeRicorda, faccendeTutte: faccende, spese: leggi("spese"), budget, rinnovi, lettere, tipi };
 }
 
 const adesso = oraItalia();
