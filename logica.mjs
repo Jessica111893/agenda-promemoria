@@ -243,3 +243,32 @@ export function inSilenzio(tipi, adesso) {
     const h = new Date(adesso).getUTCHours();
     return da < a ? (h >= da && h < a) : (h >= da || h < a);
 }
+
+// Bottoni e comportamento di ogni notifica: li usano sia l'app Android sia la web app,
+// così per cambiarli basta modificare questo file (niente ricostruzione dell'app).
+// Ogni bottone: { t: testo, u: indirizzo da aprire nell'agenda (es. "?vai=chat") }
+export function extraNotifica(n, adesso) {
+    const tag = n.tag || "", titolo = n.titolo || "";
+    const testo = encodeURIComponent(String(n.corpo || titolo).split("\n")[0].slice(0, 160));
+    const ora = new Date(adesso).getUTCHours();   // ora italiana (vedi oraItalia)
+    const tardi = ora < 19 ? { t: "🌙 Stasera", u: "?rimanda=sera&testo=" + testo } : { t: "☀️ Domani", u: "?rimanda=domani&testo=" + testo };
+    const tra1 = { t: "⏰ Tra 1 ora", u: "?rimanda=60&testo=" + testo };
+    let azioni = [], apri = "", canale = "agenda", silenziosa = false, sostituisci = "";
+    if (/^mattina\|/.test(tag)) {
+        // riepilogo del mattino: silenzioso, resta finché non lo togli, quello di oggi prende il posto di quello di ieri
+        azioni = [{ t: "📅 Apri l'agenda", u: "?vai=agenda" }]; apri = "?vai=agenda";
+        canale = "mattina"; silenziosa = true; sostituisci = "oggi";
+    } else if (/^msg|Biglietto|💌/.test(tag + " " + titolo)) {
+        azioni = [{ t: "💬 Rispondi", u: "?vai=chat" }]; apri = "?vai=chat";
+    } else if (/^facr\|/.test(tag)) {
+        // promemoria faccenda: "Fatta" la segna fatta per oggi
+        const id = tag.split("|")[2] || "";
+        const cosa = encodeURIComponent(titolo.replace(/^🔔 Oggi: /, ""));
+        azioni = [{ t: "✅ Fatta", u: "?fatta=" + encodeURIComponent(id) }, { t: tardi.t, u: tardi.u.replace(/testo=.*$/, "testo=" + cosa) }];
+    } else if (/^(sera|compl|facn|facf|pens)\|/.test(tag) || /Oggi hai|Domani hai|Compleanno|Anniversario/i.test(titolo)) {
+        azioni = [];
+    } else {
+        azioni = [tra1, tardi];
+    }
+    return { azioni: JSON.stringify(azioni), apri, canale, silenziosa: silenziosa ? "1" : "", sostituisci };
+}
