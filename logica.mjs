@@ -16,7 +16,7 @@ export function chiavePromemoria(p) {
     return p.data + "|" + (p.ora || "") + "|" + p.testo;
 }
 
-export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleanni = [], messaggi = [], pensierini = [], faccendeNuove = [], faccendeFatte = [], faccende = [], rinnovi = [], lettere = [], adesso, giaInviati, tipi = {} }) {
+export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleanni = [], messaggi = [], pensierini = [], faccendeNuove = [], faccendeFatte = [], faccende = [], faccendeTutte = [], spese = [], budget = 0, rinnovi = [], lettere = [], adesso, giaInviati, tipi = {} }) {
     const risultato = [];
     const acceso = (nome) => !tipi || tipi[nome] !== false;   // se non scelto, la notifica è accesa
     const d = new Date(adesso);
@@ -27,7 +27,7 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
     // 1) Promemoria: all'ora esatta (come prima)
     promemoria.forEach((p) => {
         if (!acceso("promemoria")) return;
-        if (!p || !p.data || !p.testo || p.notificato) return;
+        if (!p || !p.data || !p.testo || p.notificato || p.fatto) return;
         if (!p.ora) {
             // senza orario: una notifica la sera prima alle 20:00 e una la mattina alle 8:00
             const giorno = Date.parse(p.data + "T00:00:00Z");
@@ -224,6 +224,61 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
             risultato.push({ chiave, titolo: "💌 Oggi si apre una lettera", corpo: l.da ? "Te l'ha scritta " + l.da + ": aprila nell'agenda" : "Aprila nell'agenda", tag: chiave });
         });
     }
+    // 9) Domenica sera: "La vostra settimana" (faccende fatte, spese della settimana, impegni della prossima)
+    if (acceso("settimana") && d.getUTCDay() === 0 && d.getUTCHours() >= 20 && d.getUTCHours() < 23) {
+        const sett = settimanaIso(d);
+        const chiave = "sett|" + sett;
+        if (!giaInviati.has(chiave)) {
+            const righe = [];
+            // faccende: quante ne ha fatte ognuno questa settimana (🌟 a chi ne ha fatte di più)
+            const conta = {};
+            faccendeTutte.forEach((f) => {
+                if (!f || !f.fatte) return;
+                Object.keys(f.fatte).forEach((k) => {
+                    if (k !== sett && k.indexOf(sett + "-") !== 0) return;
+                    const nome = ((f.fatteDa || {})[k] || "").split(" ")[0] || "?";
+                    conta[nome] = (conta[nome] || 0) + 1;
+                });
+            });
+            const nomi = Object.keys(conta).sort((a, b) => conta[b] - conta[a]);
+            if (nomi.length) {
+                const max = conta[nomi[0]];
+                righe.push("🧹 Faccende: " + nomi.map((n) => n + " " + conta[n] + (conta[n] === max && max > 0 ? " 🌟" : "")).join(" · "));
+            }
+            // spese da lunedì a oggi
+            const iso = (x) => x.toISOString().slice(0, 10);
+            const lun = iso(new Date(Date.parse(oggi + "T12:00:00Z") - 6 * 86400000));
+            const spesi = spese.reduce((t, x) => t + (x && x.data >= lun && x.data <= oggi ? Number(x.importo) || 0 : 0), 0);
+            if (spesi > 0) righe.push("💶 Spesi questa settimana: " + euro(spesi));
+            // impegni della prossima settimana
+            const da = iso(new Date(Date.parse(oggi + "T12:00:00Z") + 86400000)), a7 = iso(new Date(Date.parse(oggi + "T12:00:00Z") + 7 * 86400000));
+            const prossimi = appuntamenti.filter((x) => x && x.titolo && !x.pagata && x.data >= da && x.data <= a7)
+                .sort((x, y) => (x.data + (x.ora || "99:99")).localeCompare(y.data + (y.ora || "99:99")));
+            if (prossimi.length) {
+                const GIORNI = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
+                const p1 = prossimi[0], g1 = GIORNI[new Date(p1.data + "T12:00:00Z").getUTCDay()];
+                righe.push("📅 La prossima: " + (prossimi.length === 1 ? "1 impegno" : prossimi.length + " impegni") + ", il primo " + g1 + (p1.ora ? " alle " + p1.ora : "") + " (" + p1.titolo + ")");
+            } else righe.push("📅 La prossima settimana è libera");
+            risultato.push({ chiave, titolo: "🌟 La vostra settimana", corpo: righe.join("\n"), tag: chiave });
+        }
+    }
+    // 10) Budget del mese: un avviso all'80% e uno al 100% (di giorno)
+    const budgetN = Number(budget) || 0;
+    if (acceso("budget") && budgetN > 0 && d.getUTCHours() >= 9 && d.getUTCHours() < 21) {
+        const mese = oggi.slice(0, 7);
+        const tot = spese.reduce((t, x) => t + (x && typeof x.data === "string" && x.data.indexOf(mese) === 0 ? Number(x.importo) || 0 : 0), 0);
+        const fineMese = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+        const restano = fineMese - d.getUTCDate();
+        const quando = restano === 0 ? "oggi è l'ultimo giorno" : restano === 1 ? "manca 1 giorno" : "mancano " + restano + " giorni";
+        const corpo = "Spesi " + euro(tot) + " su " + euro(budgetN) + " · " + quando;
+        if (tot >= budgetN) {
+            const chiave = "bud100|" + mese;
+            if (!giaInviati.has(chiave)) risultato.push({ chiave, titolo: "💶 Budget del mese superato", corpo, tag: chiave });
+        } else if (tot >= budgetN * 0.8) {
+            const chiave = "bud80|" + mese;
+            if (!giaInviati.has(chiave)) risultato.push({ chiave, titolo: "💶 Budget del mese all'" + Math.floor(tot / budgetN * 100) + "%", corpo, tag: chiave });
+        }
+    }
     return risultato;
 }
 
@@ -260,6 +315,18 @@ export function extraNotifica(n, adesso) {
         canale = "mattina"; silenziosa = true; sostituisci = "oggi";
     } else if (/^msg|Biglietto|💌/.test(tag + " " + titolo)) {
         azioni = [{ t: "💬 Rispondi", u: "?vai=chat" }]; apri = "?vai=chat";
+    } else if (/^sca\d\|/.test(tag)) {
+        // scadenza: "Pagata" la segna pagata (come il ✓ nell'agenda)
+        const pz = tag.split("|"), giorno = pz[1] || "", cosa = pz.slice(2).join("|");
+        azioni = [{ t: "✅ Pagata", u: "?pagata=" + encodeURIComponent(cosa) + "&giorno=" + giorno }, tardi];
+    } else if (/^(pmsera|pmmat)\|/.test(tag) || /^\d{4}-\d{2}-\d{2}\|/.test(tag)) {
+        // promemoria ("giorno|ora|testo", "pmsera|giorno|testo", "pmmat|giorno|testo"): "Fatto" lo segna fatto
+        const pz = tag.split("|"), giorno = /^\d/.test(tag) ? pz[0] : pz[1], cosa = pz.slice(2).join("|");
+        azioni = [{ t: "✅ Fatto", u: "?fatto=" + encodeURIComponent(cosa) + "&giorno=" + giorno }, tra1];
+    } else if (/^sett\|/.test(tag)) {
+        azioni = [{ t: "📊 Apri il riepilogo", u: "" }];
+    } else if (/^bud(80|100)\|/.test(tag)) {
+        azioni = [{ t: "💶 Apri le spese", u: "?vai=spese" }]; apri = "?vai=spese";
     } else if (/^facr\|/.test(tag)) {
         // promemoria faccenda: "Fatta" la segna fatta per oggi
         const id = tag.split("|")[2] || "";
