@@ -16,7 +16,7 @@ export function chiavePromemoria(p) {
     return p.data + "|" + (p.ora || "") + "|" + p.testo;
 }
 
-export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleanni = [], messaggi = [], pensierini = [], faccendeNuove = [], faccendeFatte = [], rinnovi = [], lettere = [], adesso, giaInviati, tipi = {} }) {
+export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleanni = [], messaggi = [], pensierini = [], faccendeNuove = [], faccendeFatte = [], faccende = [], rinnovi = [], lettere = [], adesso, giaInviati, tipi = {} }) {
     const risultato = [];
     const acceso = (nome) => !tipi || tipi[nome] !== false;   // se non scelto, la notifica è accesa
     const d = new Date(adesso);
@@ -190,6 +190,19 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
         if (giaInviati.has(chiave)) return;
         risultato.push({ chiave, titolo: "✅ " + (f.da ? f.da + " ha fatto una faccenda" : "Una faccenda è fatta"), corpo: f.testo, tag: chiave });
     });
+    // 6d) Faccende con i giorni e "🔔 Ricordamelo": la mattina del loro giorno, se nessuno l'ha ancora segnata fatta
+    if (nelMattino && acceso("faccende")) {
+        const gOggi = d.getUTCDay() || 7;   // 1 = lunedì … 7 = domenica, come nell'app
+        const sett = settimanaIso(d);
+        faccende.forEach((f) => {
+            if (!f || !f.id || !f.testo || !f.ricorda || !Array.isArray(f.giorni) || f.giorni.indexOf(gOggi) < 0) return;
+            const fatte = f.fatte || {};
+            if (fatte[sett + "-" + gOggi] || (fatte[sett] && f.giorni.length === 1)) return;   // già fatta oggi
+            const chiave = "facr|" + oggi + "|" + f.id;
+            if (giaInviati.has(chiave)) return;
+            risultato.push({ chiave, titolo: "🔔 Oggi: " + f.testo, corpo: "Da fare oggi · segnala fatta nell'agenda", tag: chiave });
+        });
+    }
     // 7) Da rinnovare: un mese prima, una settimana prima e il giorno stesso (la mattina)
     if (nelMattino && acceso("rinnovi")) {
         rinnovi.forEach((r) => {
@@ -212,6 +225,14 @@ export function calcolaNotifiche({ promemoria = [], appuntamenti = [], compleann
         });
     }
     return risultato;
+}
+
+// Settimana come nell'app (es. "2026-W47"): serve per sapere se una faccenda è già fatta
+export function settimanaIso(d) {
+    const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    const g = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - g);
+    const a = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return t.getUTCFullYear() + "-W" + String(Math.ceil(((t - a) / 864e5 + 1) / 7)).padStart(2, "0");
 }
 
 // Ore di silenzio: true se adesso le notifiche devono aspettare
