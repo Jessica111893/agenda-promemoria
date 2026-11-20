@@ -123,11 +123,11 @@ for (const uid of Object.keys(perUtente)) {
     for (const n of daInviare) {
         for (const d of perUtente[uid]) {
             try {
-                await messaggi.send({
+                               await messaggi.send({
                     token: d.id,
                     data: { titolo: n.titolo, corpo: n.corpo, tag: n.tag },
-                    webpush: { headers: { Urgency: "high", TTL: "3600" } }
-                                        android: { priority: "high", ttl: 3600 * 1000 },
+                    webpush: { headers: { Urgency: "high", TTL: "3600" } },
+                    android: { priority: "high", ttl: 3600 * 1000 }
                 });
                 inviate++;
                 console.log("Inviato:", n.titolo, "-", n.corpo.replace(/\n/g, " / "));
