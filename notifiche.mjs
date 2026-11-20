@@ -1,5 +1,5 @@
 import admin from "firebase-admin";
-import { calcolaNotifiche, inSilenzio } from "./logica.mjs";
+import { calcolaNotifiche, inSilenzio, extraNotifica } from "./logica.mjs";
 
 const chiave = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 admin.initializeApp({ credential: admin.credential.cert(chiave) });
@@ -127,7 +127,7 @@ for (const uid of Object.keys(perUtente)) {
             try {
                 await messaggi.send({
                     token: d.id,
-                    data: { titolo: n.titolo, corpo: n.corpo, tag: n.tag },
+                    data: { titolo: n.titolo, corpo: n.corpo, tag: n.tag, ...extraNotifica(n, adesso) },
                     webpush: { headers: { Urgency: "high", TTL: "3600" } },
                     android: { priority: "high", ttl: 3600 * 1000 }
                 });
