@@ -76,7 +76,8 @@ async function leggiDati(uid) {
     }
     // biglietti della Bacheca scritti dall'altra persona nelle ultime 6 ore
     const ora = Date.now();
-    const messaggi = leggi("bacheca").filter((m) => m && m.testo && m.daUid && m.daUid !== uid && ora - Number(m.quando || 0) < 6 * 3600 * 1000);
+    const messaggi = leggi("bacheca").filter((m) => m && m.testo && m.daUid && m.daUid !== uid && ora - Number(m.quando || 0) < 6 * 3600 * 1000
+        && !avvisati.includes(m.id) && !(m.letto || []).includes(uid));
     // pensierini lasciati dall'altra persona nelle ultime 6 ore
     const pensierini = leggi("biglietti").filter((b) => b && b.testo && b.daUid && b.daUid !== uid && ora - Number(b.quando || 0) < 6 * 3600 * 1000);
     // faccende di casa: nuove o appena fatte dall'altra persona (nelle ultime 6 ore)
