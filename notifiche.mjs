@@ -74,6 +74,13 @@ async function leggiDati(uid) {
         tipi = Object.assign({}, tipi, { mattina: false, sera: false });
         console.log("In vacanza fino al", vacanzaFino);
     }
+    // messaggi che l'app ha già notificato perché era aperta
+    let avvisati = [];
+    try {
+        const p = await db.doc("utenti/" + uid + "/dati/principale").get();
+        const v = JSON.parse((p.exists && p.data().messaggiAvvisati) || "[]");
+        if (Array.isArray(v)) avvisati = v;
+    } catch (e) { avvisati = []; }
     // biglietti della Bacheca scritti dall'altra persona nelle ultime 6 ore
     const ora = Date.now();
     const messaggi = leggi("bacheca").filter((m) => m && m.testo && m.daUid && m.daUid !== uid && ora - Number(m.quando || 0) < 6 * 3600 * 1000
